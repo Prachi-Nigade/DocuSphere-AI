@@ -6,24 +6,34 @@ import {
   Sparkles,
   FileText,
   Bookmark,
-  ExternalLink,
   RotateCcw,
   Menu,
   ChevronRight,
   Shield,
-  CornerDownLeft,
   Copy,
   Check,
+  FileSpreadsheet,
+  FileCode,
+  PanelRightClose,
+  PanelRightOpen,
+  ExternalLink,
+  Share2,
+  Plus,
+  Edit2,
+  Download,
 } from "lucide-react";
+import {
+
+  getFileFormat,
+  getFormatTheme,
+  formatCitationLocation,
+} from "../utils/documentUtils";
 
 /**
- * Lightweight helper to format assistant responses
- * containing headings, bold text, bullet points, and code fragments.
+ * Helper to format assistant responses
  */
 function FormattedMessageContent({ text }) {
   if (!text) return null;
-
-  // Split into paragraphs / lines
   const lines = text.split("\n");
 
   return (
@@ -32,8 +42,6 @@ function FormattedMessageContent({ text }) {
         if (!line.trim()) {
           return <div key={idx} className="h-1.5" />;
         }
-
-        // Heading 3
         if (line.startsWith("### ")) {
           return (
             <h4
@@ -45,8 +53,6 @@ function FormattedMessageContent({ text }) {
             </h4>
           );
         }
-
-        // Bullet points
         if (line.startsWith("* ") || line.startsWith("- ")) {
           const bulletContent = line.substring(2);
           return (
@@ -56,15 +62,12 @@ function FormattedMessageContent({ text }) {
             </div>
           );
         }
-
-        // Standard text
         return <p key={idx}>{renderBoldAndCode(line)}</p>;
       })}
     </div>
   );
 }
 
-// Helper to parse **bold** and `code` spans
 function renderBoldAndCode(str) {
   const parts = str.split(/(\*\*.*?\*\*|`.*?`)/g);
   return parts.map((part, i) => {
@@ -91,24 +94,36 @@ function renderBoldAndCode(str) {
 
 /**
  * ChatWindow Component
- * Main conversation interface with message stream, citation badges,
- * and bottom input composer.
+ * Conversation interface with persistent session controls:
+ * - Thread title inline rename
+ * - Share modal launcher
+ * - Export dropdown menu (Markdown, JSON, Print/PDF)
+ * - Format-aware citation badges linked to the Side-by-Side Viewer
  */
 export default function ChatWindow({
-  messages = [],
+  activeSession,
   onSendMessage,
   onResetChat,
+  onCreateNewSession,
+  onRenameSession,
+  onOpenShareModal,
+  onOpenExportModal,
   onToggleSidebar,
   onSelectCitation,
+  isViewerOpen = false,
+  onToggleViewer,
   isGenerating = false,
   indexedDocsCount = 0,
 }) {
   const [inputText, setInputText] = useState("");
   const [copiedId, setCopiedId] = useState(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState("");
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // Auto-scroll to bottom whenever messages update
+  const messages = activeSession?.messages || [];
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isGenerating]);
@@ -138,50 +153,145 @@ export default function ChatWindow({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleSaveTitle = () => {
+    if (tempTitle.trim() && activeSession) {
+      onRenameSession?.(activeSession.id, tempTitle.trim());
+    }
+    setIsEditingTitle(false);
+  };
+
   return (
-    <main className="relative flex flex-1 flex-col h-full overflow-hidden bg-slate-950">
-      {/* 1. Top Navbar / Chat Header */}
+    <main className="relative flex flex-1 flex-col h-full overflow-hidden bg-slate-950 min-w-0">
+      {/* 1. Header Toolbar */}
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-800/80 bg-slate-900/60 px-4 md:px-6 backdrop-blur-md">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 overflow-hidden">
           <button
             onClick={onToggleSidebar}
             className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-200 md:hidden"
-            title="Toggle Document Sidebar"
+            title="Toggle Sidebar"
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          <div>
+          <div className="min-w-0">
+            {/* Thread Title with Inline Edit */}
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-slate-100 tracking-tight">
-                DocuSphere Intelligence Hub
-              </h2>
-              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-emerald-500/20">
+              {isEditingTitle ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={tempTitle}
+                    onChange={(e) => setTempTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveTitle();
+                      if (e.key === "Escape") setIsEditingTitle(false);
+                    }}
+                    autoFocus
+                    className="rounded border border-indigo-500 bg-slate-900 px-2 py-0.5 text-xs text-slate-100 outline-none font-semibold"
+                  />
+                  <button
+                    onClick={handleSaveTitle}
+                    className="rounded p-1 text-emerald-400 hover:bg-slate-800"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 group/title">
+                  <h2
+                    className="text-sm font-semibold text-slate-100 tracking-tight truncate max-w-[260px] md:max-w-md cursor-pointer hover:text-indigo-300 transition"
+                    onClick={() => {
+                      setTempTitle(activeSession?.title || "");
+                      setIsEditingTitle(true);
+                    }}
+                    title="Click to rename thread"
+                  >
+                    {activeSession?.title || "DocuSphere Intelligence Hub"}
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setTempTitle(activeSession?.title || "");
+                      setIsEditingTitle(true);
+                    }}
+                    className="opacity-0 group-hover/title:opacity-100 transition-opacity p-0.5 text-slate-500 hover:text-slate-300"
+                    title="Rename thread"
+                  >
+                    <Edit2 className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              <span className="hidden lg:inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-emerald-500/20">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                RAG Online
+                Persistent RAG
               </span>
             </div>
-            <p className="text-xs text-slate-400">
-              Querying {indexedDocsCount} vectorized document
-              {indexedDocsCount !== 1 ? "s" : ""} via Spring Boot & Pinecone
+
+            <p className="text-xs text-slate-400 truncate">
+              {messages.length} messages • Querying {indexedDocsCount} multi-format documents
             </p>
           </div>
         </div>
 
-        {/* Right Header Actions */}
+        {/* Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Share Insights Button */}
           <button
-            onClick={onResetChat}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-slate-100 transition"
-            title="Reset Conversation"
+            onClick={onOpenShareModal}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-950/30 hover:text-indigo-200 transition"
+            title="Share Insights & Summary with Team"
           >
-            <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
-            <span className="hidden sm:inline">New Session</span>
+            <Share2 className="h-3.5 w-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Share</span>
+          </button>
+
+          {/* Export Button (Launches Clear Export Modal) */}
+          <button
+            onClick={onOpenExportModal}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-950/30 hover:text-indigo-200 transition"
+            title="Export Conversation Transcript & Evidence"
+          >
+            <Download className="h-3.5 w-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
+
+
+          {/* New Chat Button */}
+          <button
+            onClick={onCreateNewSession}
+            className="hidden sm:flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-slate-100 transition"
+            title="Create New Chat Thread"
+          >
+            <Plus className="h-3.5 w-3.5 text-emerald-400" />
+            <span>New Thread</span>
+          </button>
+
+          {/* Toggle Side-by-Side Document Viewer */}
+          <button
+            onClick={onToggleViewer}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+              isViewerOpen
+                ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-300"
+                : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:bg-slate-800"
+            }`}
+            title="Toggle Side-by-Side Document Viewer"
+          >
+            {isViewerOpen ? (
+              <>
+                <PanelRightClose className="h-3.5 w-3.5 text-indigo-400" />
+                <span className="hidden md:inline">Close Viewer</span>
+              </>
+            ) : (
+              <>
+                <PanelRightOpen className="h-3.5 w-3.5 text-slate-400" />
+                <span className="hidden md:inline">Split Viewer</span>
+              </>
+            )}
           </button>
         </div>
       </header>
 
-      {/* 2. Chat Message Stream */}
+      {/* 2. Message History Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <div className="mx-auto max-w-4xl space-y-6">
           {messages.map((message) => {
@@ -194,20 +304,17 @@ export default function ChatWindow({
                   isUser ? "justify-end" : "justify-start"
                 }`}
               >
-                {/* Assistant Avatar */}
                 {!isUser && (
                   <div className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/20 ring-1 ring-white/15">
                     <Bot className="h-5 w-5" />
                   </div>
                 )}
 
-                {/* Message Bubble Container */}
                 <div
                   className={`group relative max-w-[85%] md:max-w-[78%] ${
                     isUser ? "items-end" : "items-start"
                   }`}
                 >
-                  {/* Bubble Content */}
                   <div
                     className={`rounded-2xl p-4 transition-shadow ${
                       isUser
@@ -223,7 +330,7 @@ export default function ChatWindow({
                       <div>
                         <FormattedMessageContent text={message.content} />
 
-                        {/* Suggested Prompt Chips (if available) */}
+                        {/* Suggested Questions */}
                         {message.suggestedQueries &&
                           message.suggestedQueries.length > 0 && (
                             <div className="mt-4 pt-3 border-t border-slate-800/80">
@@ -248,40 +355,67 @@ export default function ChatWindow({
                             </div>
                           )}
 
-                        {/* Source Citations Section */}
+                        {/* Citations Badges */}
                         {message.citations && message.citations.length > 0 && (
                           <div className="mt-4 pt-3.5 border-t border-slate-800/80">
                             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mb-2">
                               <Bookmark className="h-3.5 w-3.5 text-indigo-400" />
-                              <span>Verified Citations & Sources</span>
+                              <span>Verified Citations (Click to Inspect in Viewer)</span>
                               <span className="rounded-full bg-slate-800 px-1.5 py-0.2 text-[10px] font-mono text-slate-400">
                                 {message.citations.length}
                               </span>
                             </div>
 
-                            {/* Rendered Badges */}
                             <div className="flex flex-wrap gap-2">
-                              {message.citations.map((citation) => (
-                                <button
-                                  key={citation.id}
-                                  onClick={() => onSelectCitation(citation)}
-                                  className="group/badge inline-flex items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-950/30 px-3 py-1.5 text-xs text-indigo-200 hover:border-indigo-400 hover:bg-indigo-900/40 transition shadow-sm hover:shadow-indigo-900/20"
-                                  title="Click to view raw retrieved chunk"
-                                >
-                                  <FileText className="h-3.5 w-3.5 text-indigo-400 group-hover/badge:text-indigo-300" />
-                                  <span className="font-medium text-slate-200 max-w-[190px] truncate">
-                                    Source: {citation.docName}
-                                  </span>
-                                  <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">
-                                    Page {citation.page}
-                                  </span>
-                                  {citation.similarity && (
-                                    <span className="text-[10px] text-emerald-400 font-mono">
-                                      {Math.round(citation.similarity * 100)}%
+                              {message.citations.map((citation) => {
+                                const format =
+                                  citation.format ||
+                                  getFileFormat(citation.docName);
+                                const theme = getFormatTheme(format);
+                                const location =
+                                  formatCitationLocation(citation);
+
+                                return (
+                                  <button
+                                    key={citation.id}
+                                    onClick={() => onSelectCitation(citation)}
+                                    className={`group/badge inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition shadow-sm hover:scale-[1.02] active:scale-[0.98] ${theme.badgeBg} ${theme.badgeBorder} hover:border-indigo-400 hover:bg-slate-800/80`}
+                                    title="Click to view & highlight in Side-by-Side Document Viewer"
+                                  >
+                                    {format === "excel" ? (
+                                      <FileSpreadsheet
+                                        className={`h-3.5 w-3.5 ${theme.iconColor}`}
+                                      />
+                                    ) : format === "markdown" ? (
+                                      <FileCode
+                                        className={`h-3.5 w-3.5 ${theme.iconColor}`}
+                                      />
+                                    ) : (
+                                      <FileText
+                                        className={`h-3.5 w-3.5 ${theme.iconColor}`}
+                                      />
+                                    )}
+
+                                    <span className="font-medium text-slate-200 max-w-[170px] truncate">
+                                      {citation.docName}
                                     </span>
-                                  )}
-                                </button>
-                              ))}
+
+                                    <span
+                                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${theme.pillBg} ${theme.badgeText}`}
+                                    >
+                                      {location}
+                                    </span>
+
+                                    {citation.similarity && (
+                                      <span className="text-[10px] text-emerald-400 font-mono">
+                                        {Math.round(citation.similarity * 100)}%
+                                      </span>
+                                    )}
+
+                                    <ExternalLink className="h-3 w-3 text-slate-500 group-hover/badge:text-slate-300" />
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -289,7 +423,7 @@ export default function ChatWindow({
                     )}
                   </div>
 
-                  {/* Message Timestamp & Copy Action */}
+                  {/* Timestamp & Copy */}
                   <div
                     className={`mt-1.5 flex items-center gap-2 px-1 text-[11px] text-slate-500 ${
                       isUser ? "justify-end" : "justify-start"
@@ -320,7 +454,6 @@ export default function ChatWindow({
                   </div>
                 </div>
 
-                {/* User Avatar */}
                 {isUser && (
                   <div className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-slate-800 text-slate-300 ring-1 ring-slate-700">
                     <User className="h-5 w-5" />
@@ -330,7 +463,6 @@ export default function ChatWindow({
             );
           })}
 
-          {/* Assistant Generating State Indicator */}
           {isGenerating && (
             <div className="flex gap-3 md:gap-4 justify-start items-start animate-pulse">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white">
@@ -340,7 +472,7 @@ export default function ChatWindow({
                 <div className="flex items-center gap-2 text-xs text-indigo-300">
                   <span className="h-2 w-2 rounded-full bg-indigo-400 animate-ping" />
                   <span>
-                    Searching Pinecone vector database & synthesizing response...
+                    Searching multi-format vector embeddings & generating citations...
                   </span>
                 </div>
               </div>
@@ -351,14 +483,13 @@ export default function ChatWindow({
         </div>
       </div>
 
-      {/* 3. Input Text Box (Composer) */}
+      {/* 3. Input Text Box */}
       <div className="border-t border-slate-800/80 bg-slate-900/60 p-4 md:p-5 backdrop-blur-md">
         <div className="mx-auto max-w-4xl">
           <form
             onSubmit={handleSubmit}
             className="relative flex items-end gap-2 rounded-2xl border border-slate-800 bg-slate-950/80 p-2 shadow-xl shadow-black/30 transition focus-within:border-indigo-500/60 focus-within:ring-1 focus-within:ring-indigo-500/40"
           >
-            {/* Textarea Input */}
             <textarea
               ref={textareaRef}
               rows={1}
@@ -372,11 +503,10 @@ export default function ChatWindow({
                 )}px`;
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything about your uploaded documents (e.g. 'Summarize Section 3.2 on Page 14')..."
+              placeholder="Ask anything across your PDFs, Excel sheets, Word docs, or Markdown files..."
               className="flex-1 max-h-36 resize-none bg-transparent px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none"
             />
 
-            {/* Send Button */}
             <button
               type="submit"
               disabled={!inputText.trim() || isGenerating}
@@ -391,13 +521,11 @@ export default function ChatWindow({
             </button>
           </form>
 
-          {/* Micro Helper Text */}
           <div className="mt-2 flex items-center justify-between px-2 text-[11px] text-slate-500">
             <div className="flex items-center gap-1.5">
               <Shield className="h-3 w-3 text-indigo-400" />
               <span>
-                DocuSphere-AI retrieves citations exclusively from validated PDF
-                chunks.
+                Saved automatically to persistent session storage.
               </span>
             </div>
             <div className="hidden sm:flex items-center gap-1">

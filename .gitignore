@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Java / Maven / Gradle
+target/
+*.class
+*.jar
+*.war
+.mvn/
+.gradle/
+build/
+backend/target/

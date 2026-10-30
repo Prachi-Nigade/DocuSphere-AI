@@ -4,8 +4,13 @@ import ChatWindow from "./components/ChatWindow";
 import DocumentViewer from "./components/DocumentViewer/DocumentViewer";
 import ShareModal from "./components/ShareModal";
 import ExportModal from "./components/ExportModal";
+import RbacModal from "./components/RbacModal";
+import LoginPage from "./components/Auth/LoginPage";
 import { INITIAL_DOCUMENTS } from "./data/initialData";
 import { getFileFormat } from "./utils/documentUtils";
+import { parseDocumentFile, formatFileSize } from "./utils/documentParser";
+import { answerDocumentQuery } from "./utils/documentIntelligence";
+import { useAuthRbac } from "./context/AuthRbacContext";
 import {
   loadSessions,
   saveSessions,
@@ -16,26 +21,78 @@ import {
 
 /**
  * Main Application Component - DocuSphere-AI
- * Renders the 3-pane layout with persistent session management:
- * 1. Sidebar: Switch between Chat Threads & Knowledge Base documents
- * 2. ChatWindow: Conversation stream with session renaming, Export & Share modals
- * 3. DocumentViewer: Interactive side-by-side multi-format viewer with auto-scroll & highlights
+ * Real multi-format document parser and question-answering intelligence engine.
+ * Mock data completely removed.
  */
 export default function App() {
-  const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
+  // 1. Persistent Documents State (Real Uploaded Files)
+  const [documents, setDocuments] = useState(() => {
+    try {
+      const saved = localStorage.getItem("docusphere_documents_v2");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Filter out any stale mock documents from previous runs
+          const isMock = parsed.some(
+            (d) =>
+              d.name?.includes("Enterprise_Security_Whitepaper") ||
+              d.name?.includes("Q3_Financial_Quarterly_Report") ||
+              d.name?.includes("API_Architecture_Spec_v2")
+          );
+          if (!isMock) {
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load documents from storage", e);
+    }
+    return INITIAL_DOCUMENTS;
+  });
+
+  // 2. Chat Sessions State
   const [sessions, setSessions] = useState(() => loadSessions());
   const [activeSessionId, setActiveSessionId] = useState(() =>
     loadActiveSessionId(sessions)
   );
+
+  // 3. UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
-  const [activeDocument, setActiveDocument] = useState(INITIAL_DOCUMENTS[0]);
+  const [activeDocument, setActiveDocument] = useState(() => documents[0] || null);
   const [activeCitation, setActiveCitation] = useState(null);
-  const [shareModalSession, setShareModalSession] = useState(null);
+  const [shareModalData, setShareModalData] = useState(null);
   const [exportModalSession, setExportModalSession] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Sync sessions to localStorage whenever sessions change
+  // 4. Optional Gemini API Key
+  const [geminiApiKey, setGeminiApiKey] = useState(() => {
+    try {
+      return localStorage.getItem("docusphere_gemini_api_key") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const {
+    isRbacModalOpen,
+    setIsRbacModalOpen,
+    permissions,
+    logAuditEvent,
+    isAuthenticated,
+    logout,
+  } = useAuthRbac();
+
+  // Sync documents to localStorage (gracefully handling storage quota)
+  useEffect(() => {
+    try {
+      localStorage.setItem("docusphere_documents_v2", JSON.stringify(documents));
+    } catch (err) {
+      console.warn("Storage quota exceeded or storage unavailable for documents", err);
+    }
+  }, [documents]);
+
+  // Sync sessions to localStorage
   useEffect(() => {
     saveSessions(sessions);
   }, [sessions]);
@@ -45,11 +102,22 @@ export default function App() {
     saveActiveSessionId(activeSessionId);
   }, [activeSessionId]);
 
+  // Auto-sync active document when documents list changes
+  useEffect(() => {
+    if (activeDocument && !documents.some((d) => d.id === activeDocument.id)) {
+      setActiveDocument(documents[0] || null);
+    } else if (!activeDocument && documents.length > 0) {
+      setActiveDocument(documents[0]);
+    }
+  }, [documents, activeDocument]);
+
   // Active session object
   const activeSession =
     sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
-  // 1. Session Management Handlers
+  // --------------------------------------------------------------------------
+  // Session Handlers
+  // --------------------------------------------------------------------------
   const handleCreateNewSession = () => {
     const newSession = createNewSession();
     setSessions((prev) => [newSession, ...prev]);
@@ -81,115 +149,172 @@ export default function App() {
     }
   };
 
-  // 2. Document Upload Handler (Multi-Format)
-  const handleUploadDocument = (file) => {
-    const newDocId = `doc-${Date.now()}`;
-    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1) + " MB";
-    const format = getFileFormat(file.name);
+  // --------------------------------------------------------------------------
+  // Real Document Upload Handler (Multi-Format PDF, Excel, Word, Text)
+  // --------------------------------------------------------------------------
+  const handleUploadDocument = async (file) => {
+    if (!permissions.canUploadDocuments) {
+      alert("Document ingestion is restricted. You must have Editor or Admin role.");
+      return;
+    }
 
-    const newDoc = {
-      id: newDocId,
+    const tempId = `doc-${Date.now()}`;
+    const format = getFileFormat(file.name);
+    const sizeStr = formatFileSize(file.size);
+
+    logAuditEvent(
+      "DOCUMENT_INGEST",
+      file.name,
+      `Analyzing & extracting ${format.toUpperCase()} (${sizeStr})`,
+      "info"
+    );
+
+    // Initial placeholder item showing progress
+    const tempDoc = {
+      id: tempId,
       name: file.name,
       format: format,
-      size: fileSizeMB,
-      pages:
-        format === "pdf" || format === "docx"
-          ? Math.floor(Math.random() * 20) + 10
-          : undefined,
-      sheetsCount: format === "excel" ? 3 : undefined,
-      sectionsCount: format === "markdown" ? 12 : undefined,
+      size: sizeStr,
       uploadedAt: "Just now",
       status: "processing",
-      progress: 35,
+      progress: 20,
       chunksCount: 0,
-      embeddingModel: "text-embedding-3-large",
-      pagesData:
-        format === "pdf"
-          ? [
-              {
-                pageNumber: 1,
-                paragraphs: [
-                  {
-                    id: "p-new-1",
-                    text: `Sample extracted content from uploaded document: ${file.name}. Parsed via Spring Boot multi-format ingestion pipeline.`,
-                    isHighlighted: true,
-                  },
-                ],
-              },
-            ]
-          : undefined,
+      embeddingModel: "semantic-rag-v2",
     };
 
-    setDocuments((prev) => [newDoc, ...prev]);
+    setDocuments((prev) => [tempDoc, ...prev]);
 
-    // Simulate backend vectorization
-    setTimeout(() => {
+    try {
+      // Real document parsing across PDF, Excel, Word, Text
+      const parsedDoc = await parseDocumentFile(file, (progress) => {
+        setDocuments((prev) =>
+          prev.map((d) => (d.id === tempId ? { ...d, progress } : d))
+        );
+      });
+
+      // Replace placeholder with fully parsed document
       setDocuments((prev) =>
-        prev.map((d) => (d.id === newDocId ? { ...d, progress: 80 } : d))
+        prev.map((d) => (d.id === tempId ? parsedDoc : d))
       );
-    }, 1200);
+      setActiveDocument(parsedDoc);
+      setIsViewerOpen(true);
 
-    setTimeout(() => {
-      setDocuments((prev) =>
-        prev.map((d) =>
-          d.id === newDocId
+      logAuditEvent(
+        "DOCUMENT_INDEXED",
+        file.name,
+        `Indexed ${parsedDoc.chunksCount} semantic chunks for ${format.toUpperCase()}`,
+        "info"
+      );
+
+      // Auto-post confirmation message to active chat thread with dynamic suggested questions
+      const unitsDescription = parsedDoc.pages
+        ? `${parsedDoc.pages} pages`
+        : parsedDoc.sheetsCount
+        ? `${parsedDoc.sheetsCount} sheets (${parsedDoc.rowsCount || 0} rows)`
+        : `${parsedDoc.sectionsCount || 1} sections`;
+
+      const welcomeMsg = {
+        id: `msg-${Date.now()}`,
+        sender: "assistant",
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        content: `I've analyzed and indexed **${parsedDoc.name}** (${parsedDoc.format?.toUpperCase()}, ${parsedDoc.size}).\n\n* **Extracted**: ${unitsDescription}\n* **Semantic Chunks**: **${parsedDoc.chunksCount} chunks** indexed and ready for question answering.\n\nYou can now ask any question specific to this document!`,
+        citations: [],
+        suggestedQueries: parsedDoc.suggestedQuestions || [
+          `Summarize the key points in ${parsedDoc.name}`,
+          "What are the main topics and conclusions?",
+        ],
+      };
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeSession?.id
             ? {
-                ...d,
-                status: "indexed",
-                progress: 100,
-                chunksCount: Math.floor(Math.random() * 50) + 35,
+                ...s,
+                updatedAt: new Date().toISOString(),
+                messages: [...s.messages, welcomeMsg],
               }
-            : d
+            : s
         )
       );
-    }, 2400);
-  };
-
-  // 3. Document Deletion Handler
-  const handleDeleteDocument = (docId) => {
-    setDocuments((prev) => prev.filter((d) => d.id !== docId));
-    if (activeDocument?.id === docId) {
-      setActiveDocument(null);
-      setIsViewerOpen(false);
+    } catch (err) {
+      console.error("Failed to parse document:", err);
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.id === tempId ? { ...d, status: "failed", progress: 0 } : d
+        )
+      );
+      alert(`Failed to parse ${file.name}: ${err.message}`);
     }
   };
 
-  // 4. Select Document for Viewer
+  // --------------------------------------------------------------------------
+  // Document Deletion Handler (Admin Only)
+  // --------------------------------------------------------------------------
+  const handleDeleteDocument = (docId) => {
+    if (!permissions.canDeleteDocuments) {
+      alert("Document deletion is restricted. Only Admins can permanently purge vector documents.");
+      return;
+    }
+
+    const docToDelete = documents.find((d) => d.id === docId);
+    logAuditEvent(
+      "DOCUMENT_PURGE",
+      docToDelete?.name || docId,
+      `Permanently deleted document and vector chunks from store`,
+      "security"
+    );
+
+    setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    if (activeDocument?.id === docId) {
+      const remaining = documents.filter((d) => d.id !== docId);
+      setActiveDocument(remaining[0] || null);
+      if (remaining.length === 0) {
+        setIsViewerOpen(false);
+      }
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // Select Document for Viewer
+  // --------------------------------------------------------------------------
   const handleSelectDocument = (doc) => {
+    logAuditEvent(
+      "DOCUMENT_VIEW",
+      doc.name,
+      `Opened in Side-by-Side viewer (${doc.format?.toUpperCase()})`,
+      "info"
+    );
     setActiveDocument(doc);
     setActiveCitation(null);
     setIsViewerOpen(true);
   };
 
-  // 5. Select Citation Handler (Launches Viewer & Auto-scrolls)
+  // --------------------------------------------------------------------------
+  // Select Citation Handler (Launches Viewer & Focuses Highlight)
+  // --------------------------------------------------------------------------
   const handleSelectCitation = (citation) => {
     setActiveCitation(citation);
 
-    const matchedDoc = documents.find((d) => d.name === citation.docName) || {
-      id: `doc-ext-${Date.now()}`,
-      name: citation.docName,
-      format: citation.format || getFileFormat(citation.docName),
-      size: "2.4 MB",
-      pagesData: [
-        {
-          pageNumber: citation.page || 1,
-          paragraphs: [
-            {
-              id: "p-cited",
-              text: citation.snippet,
-              isHighlighted: true,
-            },
-          ],
-        },
-      ],
-    };
+    // Look up doc by ID or name
+    const matchedDoc = documents.find(
+      (d) =>
+        (citation.docId && d.id === citation.docId) ||
+        d.name === citation.docName
+    );
 
-    setActiveDocument(matchedDoc);
-    setIsViewerOpen(true);
+    if (matchedDoc) {
+      setActiveDocument(matchedDoc);
+      setIsViewerOpen(true);
+    }
   };
 
-  // 6. Send Message Handler (Persists to Active Session)
-  const handleSendMessage = (userText) => {
+  // --------------------------------------------------------------------------
+  // Real Question Answering Handler (Grounded in Uploaded Documents)
+  // --------------------------------------------------------------------------
+  const handleSendMessage = async (userText) => {
     if (!activeSession) return;
 
     const userMsg = {
@@ -203,14 +328,14 @@ export default function App() {
       citations: [],
     };
 
-    // Update session title automatically if this is the first question
+    // Update session title automatically if this is the first user query
     const updatedTitle =
       activeSession.title === "New Knowledge Inquiry" ||
+      activeSession.title === "Document Intelligence Workspace" ||
       activeSession.messages.length <= 1
         ? userText.slice(0, 36) + (userText.length > 36 ? "..." : "")
         : activeSession.title;
 
-    // Append user message immediately
     setSessions((prev) =>
       prev.map((s) =>
         s.id === activeSession.id
@@ -227,68 +352,14 @@ export default function App() {
 
     setIsGenerating(true);
 
-    // Simulate RAG generation with format-specific citations
-    setTimeout(() => {
-      const isExcelQuery =
-        userText.toLowerCase().includes("revenue") ||
-        userText.toLowerCase().includes("margin") ||
-        userText.toLowerCase().includes("financial");
-
-      const isMarkdownQuery =
-        userText.toLowerCase().includes("rate limit") ||
-        userText.toLowerCase().includes("api") ||
-        userText.toLowerCase().includes("spec");
-
-      let assistantContent = "";
-      let citationsList = [];
-
-      if (isExcelQuery) {
-        const excelDoc =
-          documents.find((d) => d.format === "excel") || documents[1];
-        assistantContent = `Synthesized data from the financial spreadsheet **"${excelDoc.name}"**:\n\n### Revenue Metrics\n* **Gross Performance**: Recorded **$21.4M** for Q3-2024.\n* **Operational Margin**: Reached **46.2%**.\n\n*Click the citation badge below to inspect the highlighted row in the spreadsheet grid.*`;
-        citationsList = [
-          {
-            id: `cit-${Date.now()}`,
-            docName: excelDoc.name,
-            format: "excel",
-            sheet: "Revenue & Margins",
-            row: 3,
-            similarity: 0.96,
-            snippet:
-              "Q3-2024: Revenue $21.4M, Gross Profit $15.6M, Operating Margin 46.2%",
-          },
-        ];
-      } else if (isMarkdownQuery) {
-        const mdDoc =
-          documents.find((d) => d.format === "markdown") || documents[2];
-        assistantContent = `Retrieved parameters from **"${mdDoc.name}"**:\n\n### Rate Limiting Policy\n* **Algorithm**: Token bucket algorithm.\n* **Capacity**: 100 requests per tenant, 20 tokens refill rate.\n\n*Click the citation badge below to view the markdown specification.*`;
-        citationsList = [
-          {
-            id: `cit-${Date.now()}`,
-            docName: mdDoc.name,
-            format: "markdown",
-            section: "Rate Limiting & Throttling",
-            similarity: 0.94,
-            snippet:
-              "All API requests to /api/v1/chat are governed by a token-bucket algorithm capped at 100 requests...",
-          },
-        ];
-      } else {
-        const pdfDoc =
-          documents.find((d) => d.format === "pdf") || documents[0];
-        assistantContent = `Cross-referencing verified policies in **"${pdfDoc.name}"**:\n\n### Document Findings\n* **Security Baseline**: Encryption standards mandate **AES-256-GCM** for data at rest and **TLS 1.3** for data in transit.\n* **Key Rotation**: 90-day automated HSM rotation cycles.\n\n*Click the citation badge to jump to Page 14 and view the highlighted paragraph.*`;
-        citationsList = [
-          {
-            id: `cit-${Date.now()}`,
-            docName: pdfDoc.name,
-            format: "pdf",
-            page: 14,
-            similarity: 0.94,
-            snippet:
-              "Section 4.2 - Storage Cryptography: All relational databases, blob storage buckets, and semantic vector stores mandate AES-256-GCM envelope encryption...",
-          },
-        ];
-      }
+    try {
+      // Real grounded question answering across uploaded document(s)
+      const ragResult = await answerDocumentQuery({
+        query: userText,
+        documents: documents,
+        activeDocumentId: activeDocument?.id,
+        geminiApiKey: geminiApiKey,
+      });
 
       const assistantMsg = {
         id: `msg-${Date.now() + 1}`,
@@ -297,8 +368,9 @@ export default function App() {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        content: assistantContent,
-        citations: citationsList,
+        content: ragResult.content,
+        citations: ragResult.citations || [],
+        suggestedQueries: ragResult.suggestedQueries || [],
       };
 
       setSessions((prev) =>
@@ -312,22 +384,62 @@ export default function App() {
             : s
         )
       );
+    } catch (err) {
+      console.error("Error analyzing document query:", err);
+      const errorMsg = {
+        id: `msg-${Date.now() + 1}`,
+        sender: "assistant",
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        content: `An error occurred while analyzing the document: ${err.message}. Please verify the document has finished indexing.`,
+        citations: [],
+      };
 
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeSession.id
+            ? {
+                ...s,
+                updatedAt: new Date().toISOString(),
+                messages: [...s.messages, errorMsg],
+              }
+            : s
+        )
+      );
+    } finally {
       setIsGenerating(false);
-    }, 1400);
+    }
   };
 
+  const handleUpdateApiKey = (key) => {
+    setGeminiApiKey(key);
+    try {
+      if (key && key.trim()) {
+        localStorage.setItem("docusphere_gemini_api_key", key.trim());
+      } else {
+        localStorage.removeItem("docusphere_gemini_api_key");
+      }
+    } catch {}
+  };
+
+  // If user is not authenticated, render the starting LoginPage
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-950 font-sans antialiased text-slate-100">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans antialiased text-slate-900 dark:text-slate-100 transition-colors duration-200">
       {/* Mobile Backdrop Overlay */}
       {isSidebarOpen && (
         <div
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-xs md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs md:hidden"
         />
       )}
 
-      {/* 1. Left Sidebar: Sessions / Threads & Knowledge Base */}
+      {/* 1. Left Sidebar: Sessions / Threads & Knowledge Base Documents */}
       <Sidebar
         documents={documents}
         sessions={sessions}
@@ -336,7 +448,8 @@ export default function App() {
         onCreateNewSession={handleCreateNewSession}
         onRenameSession={handleRenameSession}
         onDeleteSession={handleDeleteSession}
-        onShareSession={(s) => setShareModalSession(s)}
+        onShareSession={(s) => setShareModalData({ session: s })}
+        onShareDocument={(doc) => setShareModalData({ document: doc })}
         onExportSession={(s) => setExportModalSession(s)}
         onUploadDocument={handleUploadDocument}
         onDeleteDocument={handleDeleteDocument}
@@ -344,15 +457,16 @@ export default function App() {
         activeDocumentId={activeDocument?.id}
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
+        onLogout={logout}
       />
 
-      {/* 2. Center Panel: Conversational RAG Window */}
+      {/* 2. Center Panel: Conversational Document Intelligence Window */}
       <ChatWindow
         activeSession={activeSession}
         onSendMessage={handleSendMessage}
         onCreateNewSession={handleCreateNewSession}
         onRenameSession={handleRenameSession}
-        onOpenShareModal={() => setShareModalSession(activeSession)}
+        onOpenShareModal={() => setShareModalData({ session: activeSession })}
         onOpenExportModal={() => setExportModalSession(activeSession)}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         onSelectCitation={handleSelectCitation}
@@ -362,22 +476,31 @@ export default function App() {
         indexedDocsCount={
           documents.filter((d) => d.status === "indexed").length
         }
+        activeDocument={activeDocument}
+        documents={documents}
+        onSelectDocument={handleSelectDocument}
+        onUploadDocument={handleUploadDocument}
+        geminiApiKey={geminiApiKey}
+        onUpdateApiKey={handleUpdateApiKey}
+        onLogout={logout}
       />
 
-      {/* 3. Right Panel: Interactive Side-by-Side Document Viewer */}
+      {/* 3. Right Panel: Interactive Multi-Format Document Viewer */}
       {isViewerOpen && (
         <DocumentViewer
           document={activeDocument}
           activeCitation={activeCitation}
           onClose={() => setIsViewerOpen(false)}
+          onShareDocument={(doc) => setShareModalData({ document: doc })}
         />
       )}
 
-      {/* 4. Share Insights Modal */}
-      {shareModalSession && (
+      {/* 4. Share Insights & Document Modal (WhatsApp, Socials & Links) */}
+      {shareModalData && (
         <ShareModal
-          session={shareModalSession}
-          onClose={() => setShareModalSession(null)}
+          session={shareModalData.session}
+          document={shareModalData.document}
+          onClose={() => setShareModalData(null)}
         />
       )}
 
@@ -388,6 +511,12 @@ export default function App() {
           onClose={() => setExportModalSession(null)}
         />
       )}
+
+      {/* 6. RBAC Management & Audit Matrix Modal */}
+      <RbacModal
+        isOpen={isRbacModalOpen}
+        onClose={() => setIsRbacModalOpen(false)}
+      />
     </div>
   );
 }

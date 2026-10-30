@@ -6,7 +6,6 @@ import {
   Sparkles,
   FileText,
   Bookmark,
-  RotateCcw,
   Menu,
   ChevronRight,
   Shield,
@@ -17,17 +16,33 @@ import {
   PanelRightClose,
   PanelRightOpen,
   ExternalLink,
-  Share2,
   Plus,
   Edit2,
   Download,
+  Sun,
+  Moon,
+  UploadCloud,
+  KeyRound,
+  X,
+  LogOut,
 } from "lucide-react";
 import {
-
   getFileFormat,
   getFormatTheme,
   formatCitationLocation,
 } from "../utils/documentUtils";
+import { useTheme } from "../context/ThemeContext";
+import { useAuthRbac } from "../context/AuthRbacContext";
+import RoleSelector from "./RoleSelector";
+import { openWhatsAppShare } from "../utils/shareUtils";
+
+function WhatsAppIcon({ className = "h-3.5 w-3.5" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12.031 2C6.5 2 2.016 6.484 2.016 12.016c0 1.766.46 3.492 1.332 5.015L2 22l5.125-1.344A9.974 9.974 0 0012.031 22C17.562 22 22 17.531 22 12.016 22 6.484 17.547 2 12.031 2zm0 18.297c-1.547 0-3.063-.414-4.39-1.203l-.313-.188-3.266.86.875-3.188-.203-.328A8.257 8.257 0 013.75 12.016c0-4.563 3.719-8.281 8.281-8.281 4.547 0 8.266 3.719 8.266 8.281 0 4.563-3.719 8.281-8.266 8.281zm4.531-6.188c-.25-.125-1.469-.719-1.688-.813-.234-.094-.406-.14-.578.14-.172.266-.672.828-.828 1-.156.172-.313.187-.563.062-.25-.125-1.062-.39-2.016-1.234-.75-.672-1.25-1.5-1.39-1.75-.157-.25-.016-.39.109-.516.109-.109.25-.281.375-.422.125-.14.172-.234.25-.39.078-.172.047-.313-.016-.438-.078-.14-.578-1.406-.812-1.922-.219-.516-.438-.438-.61-.438-.156 0-.328-.016-.5-.016s-.453.063-.688.313c-.234.25-.906.875-.906 2.14 0 1.25.922 2.469 1.047 2.641.14.172 1.813 2.766 4.39 3.875.61.266 1.094.422 1.469.547.61.188 1.172.172 1.609.094.484-.078 1.469-.61 1.672-1.188.219-.594.219-1.094.156-1.203-.062-.125-.234-.188-.484-.313z" />
+    </svg>
+  );
+}
 
 /**
  * Helper to format assistant responses
@@ -37,7 +52,7 @@ function FormattedMessageContent({ text }) {
   const lines = text.split("\n");
 
   return (
-    <div className="space-y-2 text-sm leading-relaxed text-slate-200">
+    <div className="space-y-2 text-xs md:text-sm leading-relaxed text-slate-800 dark:text-slate-200">
       {lines.map((line, idx) => {
         if (!line.trim()) {
           return <div key={idx} className="h-1.5" />;
@@ -46,9 +61,9 @@ function FormattedMessageContent({ text }) {
           return (
             <h4
               key={idx}
-              className="mt-3 text-sm font-semibold tracking-wide text-slate-100 flex items-center gap-1.5"
+              className="mt-3 text-xs md:text-sm font-bold tracking-wide text-slate-900 dark:text-slate-100 flex items-center gap-1.5"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
+              <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
               {line.replace("### ", "")}
             </h4>
           );
@@ -56,8 +71,11 @@ function FormattedMessageContent({ text }) {
         if (line.startsWith("* ") || line.startsWith("- ")) {
           const bulletContent = line.substring(2);
           return (
-            <div key={idx} className="ml-3 flex items-start gap-2 text-slate-300">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400/80" />
+            <div
+              key={idx}
+              className="ml-3 flex items-start gap-2 text-slate-700 dark:text-slate-300"
+            >
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500/80" />
               <span>{renderBoldAndCode(bulletContent)}</span>
             </div>
           );
@@ -73,7 +91,7 @@ function renderBoldAndCode(str) {
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={i} className="font-semibold text-slate-100">
+        <strong key={i} className="font-bold text-slate-900 dark:text-slate-100">
           {part.slice(2, -2)}
         </strong>
       );
@@ -82,7 +100,7 @@ function renderBoldAndCode(str) {
       return (
         <code
           key={i}
-          className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-indigo-300"
+          className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-indigo-700 dark:text-indigo-300 border border-slate-200 dark:border-slate-700"
         >
           {part.slice(1, -1)}
         </code>
@@ -94,16 +112,12 @@ function renderBoldAndCode(str) {
 
 /**
  * ChatWindow Component
- * Conversation interface with persistent session controls:
- * - Thread title inline rename
- * - Share modal launcher
- * - Export dropdown menu (Markdown, JSON, Print/PDF)
- * - Format-aware citation badges linked to the Side-by-Side Viewer
+ * Conversation interface with real multi-format document analysis,
+ * persistent session controls, theme toggling, and grounded citations.
  */
 export default function ChatWindow({
   activeSession,
   onSendMessage,
-  onResetChat,
   onCreateNewSession,
   onRenameSession,
   onOpenShareModal,
@@ -114,13 +128,28 @@ export default function ChatWindow({
   onToggleViewer,
   isGenerating = false,
   indexedDocsCount = 0,
+  activeDocument = null,
+  documents = [],
+  onSelectDocument,
+  onUploadDocument,
+  geminiApiKey = "",
+  onUpdateApiKey,
+  onLogout,
 }) {
   const [inputText, setInputText] = useState("");
   const [copiedId, setCopiedId] = useState(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState("");
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey || "");
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const { toggleTheme, isDark } = useTheme();
+  const { openRbacModal, logAuditEvent } = useAuthRbac();
 
   const messages = activeSession?.messages || [];
 
@@ -132,6 +161,7 @@ export default function ChatWindow({
     e?.preventDefault();
     if (!inputText.trim() || isGenerating) return;
 
+    logAuditEvent("RAG_QUERY", "Document Inquiry", inputText.trim().slice(0, 48), "info");
     onSendMessage(inputText.trim());
     setInputText("");
 
@@ -160,14 +190,59 @@ export default function ChatWindow({
     setIsEditingTitle(false);
   };
 
+  const handleSaveApiKey = () => {
+    onUpdateApiKey?.(apiKeyInput.trim());
+    setIsApiKeyModalOpen(false);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onUploadDocument?.(e.dataTransfer.files[0]);
+    }
+  };
+
+  const activeDocTheme = activeDocument ? getFormatTheme(activeDocument.format) : null;
+
   return (
-    <main className="relative flex flex-1 flex-col h-full overflow-hidden bg-slate-950 min-w-0">
+    <main
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`relative flex flex-1 flex-col h-full overflow-hidden bg-slate-50/60 dark:bg-slate-950 min-w-0 transition-colors ${
+        isDraggingOver ? "ring-4 ring-indigo-500/50 bg-indigo-50/20" : ""
+      }`}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.md,.markdown,.txt"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.[0]) {
+            onUploadDocument?.(e.target.files[0]);
+            e.target.value = "";
+          }
+        }}
+      />
+
       {/* 1. Header Toolbar */}
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-800/80 bg-slate-900/60 px-4 md:px-6 backdrop-blur-md">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/60 px-4 md:px-6 backdrop-blur-md transition-colors">
         <div className="flex items-center gap-3 overflow-hidden">
           <button
             onClick={onToggleSidebar}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-200 md:hidden"
+            className="rounded-xl p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 md:hidden"
             title="Toggle Sidebar"
           >
             <Menu className="h-5 w-5" />
@@ -187,11 +262,11 @@ export default function ChatWindow({
                       if (e.key === "Escape") setIsEditingTitle(false);
                     }}
                     autoFocus
-                    className="rounded border border-indigo-500 bg-slate-900 px-2 py-0.5 text-xs text-slate-100 outline-none font-semibold"
+                    className="rounded-lg border border-indigo-500 bg-white dark:bg-slate-900 px-2 py-0.5 text-xs text-slate-900 dark:text-slate-100 outline-none font-bold"
                   />
                   <button
                     onClick={handleSaveTitle}
-                    className="rounded p-1 text-emerald-400 hover:bg-slate-800"
+                    className="rounded p-1 text-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
                     <Check className="h-3.5 w-3.5" />
                   </button>
@@ -199,21 +274,21 @@ export default function ChatWindow({
               ) : (
                 <div className="flex items-center gap-1.5 group/title">
                   <h2
-                    className="text-sm font-semibold text-slate-100 tracking-tight truncate max-w-[260px] md:max-w-md cursor-pointer hover:text-indigo-300 transition"
+                    className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate max-w-[200px] md:max-w-md cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-300 transition"
                     onClick={() => {
                       setTempTitle(activeSession?.title || "");
                       setIsEditingTitle(true);
                     }}
                     title="Click to rename thread"
                   >
-                    {activeSession?.title || "DocuSphere Intelligence Hub"}
+                    {activeSession?.title || "Document Intelligence Workspace"}
                   </h2>
                   <button
                     onClick={() => {
                       setTempTitle(activeSession?.title || "");
                       setIsEditingTitle(true);
                     }}
-                    className="opacity-0 group-hover/title:opacity-100 transition-opacity p-0.5 text-slate-500 hover:text-slate-300"
+                    className="opacity-0 group-hover/title:opacity-100 transition-opacity p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                     title="Rename thread"
                   >
                     <Edit2 className="h-3 w-3" />
@@ -221,79 +296,169 @@ export default function ChatWindow({
                 </div>
               )}
 
-              <span className="hidden lg:inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-emerald-500/20">
+              {/* Status Badge */}
+              <span className="hidden lg:inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Persistent RAG
+                Real-Time RAG
               </span>
             </div>
 
-            <p className="text-xs text-slate-400 truncate">
-              {messages.length} messages • Querying {indexedDocsCount} multi-format documents
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+              <span>{messages.length} messages</span>
+              <span>•</span>
+              {activeDocument ? (
+                <span className="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                  Active: <strong className="font-semibold text-indigo-600 dark:text-indigo-400 truncate max-w-[150px]">{activeDocument.name}</strong>
+                </span>
+              ) : (
+                <span>{indexedDocsCount} uploaded documents</span>
+              )}
             </p>
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {/* Share Insights Button */}
+          {/* AI Engine & API Key Switcher */}
+          <button
+            onClick={() => {
+              setApiKeyInput(geminiApiKey || "");
+              setIsApiKeyModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-xs"
+            title="Configure AI Engine (Google Gemini API or Built-in Semantic RAG)"
+          >
+            <Sparkles className={`h-3.5 w-3.5 ${geminiApiKey ? "text-amber-500" : "text-indigo-500"}`} />
+            <span className="hidden xl:inline">{geminiApiKey ? "Gemini LLM" : "Local RAG"}</span>
+          </button>
+
+          {/* RBAC Active Role Persona & Switcher */}
+          <RoleSelector compact={false} />
+
+          {/* RBAC Matrix & Governance Dialog Trigger */}
+          <button
+            onClick={() => openRbacModal("matrix")}
+            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/70 dark:bg-purple-950/30 px-2.5 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:border-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition shadow-xs cursor-pointer"
+            title="Role-Based Access Control (RBAC) Governance"
+          >
+            <Shield className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+            <span className="hidden xl:inline">RBAC</span>
+          </button>
+
+          {/* THEME TOGGLE: Switch between Light and Dark */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-xs"
+            title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+          >
+            {isDark ? (
+              <>
+                <Sun className="h-3.5 w-3.5 text-amber-400" />
+                <span className="hidden md:inline">Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="h-3.5 w-3.5 text-indigo-600" />
+                <span className="hidden md:inline">Dark</span>
+              </>
+            )}
+          </button>
+
+          {/* Share Insights Button (WhatsApp & Socials) */}
           <button
             onClick={onOpenShareModal}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-950/30 hover:text-indigo-200 transition"
-            title="Share Insights & Summary with Team"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366] transition shadow-xs"
+            title="Share Insights & Summary via WhatsApp & Socials"
           >
-            <Share2 className="h-3.5 w-3.5 text-indigo-400" />
+            <WhatsAppIcon className="h-3.5 w-3.5 text-[#25D366]" />
             <span className="hidden sm:inline">Share</span>
           </button>
 
-          {/* Export Button (Launches Clear Export Modal) */}
+          {/* Export Button */}
           <button
             onClick={onOpenExportModal}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-950/30 hover:text-indigo-200 transition"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:text-indigo-600 dark:hover:text-indigo-200 transition shadow-xs"
             title="Export Conversation Transcript & Evidence"
           >
-            <Download className="h-3.5 w-3.5 text-indigo-400" />
+            <Download className="h-3.5 w-3.5 text-indigo-500" />
             <span className="hidden sm:inline">Export</span>
           </button>
-
 
           {/* New Chat Button */}
           <button
             onClick={onCreateNewSession}
-            className="hidden sm:flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-slate-100 transition"
+            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition shadow-xs"
             title="Create New Chat Thread"
           >
-            <Plus className="h-3.5 w-3.5 text-emerald-400" />
+            <Plus className="h-3.5 w-3.5 text-emerald-500" />
             <span>New Thread</span>
           </button>
 
           {/* Toggle Side-by-Side Document Viewer */}
           <button
             onClick={onToggleViewer}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+            className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
               isViewerOpen
-                ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-300"
-                : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:bg-slate-800"
+                ? "border-indigo-500 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300"
+                : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
             title="Toggle Side-by-Side Document Viewer"
           >
             {isViewerOpen ? (
               <>
-                <PanelRightClose className="h-3.5 w-3.5 text-indigo-400" />
+                <PanelRightClose className="h-3.5 w-3.5 text-indigo-500" />
                 <span className="hidden md:inline">Close Viewer</span>
               </>
             ) : (
               <>
-                <PanelRightOpen className="h-3.5 w-3.5 text-slate-400" />
+                <PanelRightOpen className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
                 <span className="hidden md:inline">Split Viewer</span>
               </>
             )}
           </button>
+
+          {/* Sign Out Button */}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-rose-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition shadow-xs cursor-pointer"
+              title="Sign Out of DocuSphere-AI"
+            >
+              <LogOut className="h-3.5 w-3.5 text-rose-500" />
+              <span className="hidden xl:inline">Sign Out</span>
+            </button>
+          )}
         </div>
       </header>
 
       {/* 2. Message History Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <div className="mx-auto max-w-4xl space-y-6">
+          {/* Empty State Banner if no documents are uploaded yet */}
+          {indexedDocsCount === 0 && (
+            <div className="rounded-2xl border-2 border-dashed border-indigo-300 dark:border-indigo-900/60 bg-gradient-to-b from-indigo-50/60 to-white dark:from-indigo-950/30 dark:to-slate-900/40 p-6 md:p-8 text-center shadow-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 mb-4 ring-1 ring-indigo-500/20">
+                <UploadCloud className="h-7 w-7" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                Upload a Document to Begin
+              </h3>
+              <p className="mt-1.5 text-xs md:text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
+                DocuSphere-AI directly parses and analyzes your real files in <strong>PDF, Word (.docx), Excel (.xlsx/.csv), Markdown, and Text (.txt)</strong>. Ask any question and receive verified answers with interactive citations.
+              </p>
+              <div className="mt-5 flex justify-center gap-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 text-xs font-semibold shadow-md shadow-indigo-600/25 transition cursor-pointer hover:scale-105 active:scale-95"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Choose Document File</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Messages Stream */}
           {messages.map((message) => {
             const isUser = message.sender === "user";
 
@@ -305,25 +470,25 @@ export default function ChatWindow({
                 }`}
               >
                 {!isUser && (
-                  <div className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/20 ring-1 ring-white/15">
+                  <div className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-600/25 ring-1 ring-white/20">
                     <Bot className="h-5 w-5" />
                   </div>
                 )}
 
                 <div
-                  className={`group relative max-w-[85%] md:max-w-[78%] ${
+                  className={`group relative max-w-[88%] md:max-w-[80%] ${
                     isUser ? "items-end" : "items-start"
                   }`}
                 >
                   <div
                     className={`rounded-2xl p-4 transition-shadow ${
                       isUser
-                        ? "rounded-tr-none bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-950/40"
-                        : "rounded-tl-none border border-slate-800/90 bg-slate-900/90 text-slate-200 shadow-lg shadow-black/20"
+                        ? "rounded-tr-none bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/20"
+                        : "rounded-tl-none border border-slate-200 dark:border-slate-800/90 bg-white dark:bg-slate-900/90 text-slate-800 dark:text-slate-200 shadow-sm dark:shadow-lg dark:shadow-black/20"
                     }`}
                   >
                     {isUser ? (
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap font-normal">
+                      <p className="text-xs md:text-sm leading-relaxed whitespace-pre-wrap font-normal">
                         {message.content}
                       </p>
                     ) : (
@@ -333,9 +498,9 @@ export default function ChatWindow({
                         {/* Suggested Questions */}
                         {message.suggestedQueries &&
                           message.suggestedQueries.length > 0 && (
-                            <div className="mt-4 pt-3 border-t border-slate-800/80">
-                              <p className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
-                                <Sparkles className="h-3 w-3 text-indigo-400" />
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
+                                <Sparkles className="h-3 w-3 text-indigo-500" />
                                 Recommended Inquiries:
                               </p>
                               <div className="flex flex-wrap gap-2">
@@ -344,7 +509,7 @@ export default function ChatWindow({
                                     <button
                                       key={qIdx}
                                       onClick={() => onSendMessage(query)}
-                                      className="rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-1.5 text-xs text-indigo-300 hover:border-indigo-500/40 hover:bg-indigo-500/10 hover:text-indigo-200 transition text-left flex items-center gap-1.5"
+                                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 px-2.5 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition text-left flex items-center gap-1.5 cursor-pointer"
                                     >
                                       <span>{query}</span>
                                       <ChevronRight className="h-3 w-3 opacity-60" />
@@ -357,11 +522,11 @@ export default function ChatWindow({
 
                         {/* Citations Badges */}
                         {message.citations && message.citations.length > 0 && (
-                          <div className="mt-4 pt-3.5 border-t border-slate-800/80">
-                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mb-2">
-                              <Bookmark className="h-3.5 w-3.5 text-indigo-400" />
+                          <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800/80">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                              <Bookmark className="h-3.5 w-3.5 text-indigo-500" />
                               <span>Verified Citations (Click to Inspect in Viewer)</span>
-                              <span className="rounded-full bg-slate-800 px-1.5 py-0.2 text-[10px] font-mono text-slate-400">
+                              <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                                 {message.citations.length}
                               </span>
                             </div>
@@ -379,7 +544,7 @@ export default function ChatWindow({
                                   <button
                                     key={citation.id}
                                     onClick={() => onSelectCitation(citation)}
-                                    className={`group/badge inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition shadow-sm hover:scale-[1.02] active:scale-[0.98] ${theme.badgeBg} ${theme.badgeBorder} hover:border-indigo-400 hover:bg-slate-800/80`}
+                                    className={`group/badge inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition shadow-xs hover:scale-[1.02] active:scale-[0.98] ${theme.badgeBg} ${theme.badgeBorder} hover:border-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer`}
                                     title="Click to view & highlight in Side-by-Side Document Viewer"
                                   >
                                     {format === "excel" ? (
@@ -396,23 +561,23 @@ export default function ChatWindow({
                                       />
                                     )}
 
-                                    <span className="font-medium text-slate-200 max-w-[170px] truncate">
+                                    <span className="font-semibold text-slate-800 dark:text-slate-200 max-w-[120px] truncate">
                                       {citation.docName}
                                     </span>
 
                                     <span
-                                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${theme.pillBg} ${theme.badgeText}`}
+                                      className={`rounded px-1.5 py-0.2 text-[10px] font-mono font-bold ${theme.pillBg} ${theme.badgeText}`}
                                     >
                                       {location}
                                     </span>
 
                                     {citation.similarity && (
-                                      <span className="text-[10px] text-emerald-400 font-mono">
+                                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
                                         {Math.round(citation.similarity * 100)}%
                                       </span>
                                     )}
 
-                                    <ExternalLink className="h-3 w-3 text-slate-500 group-hover/badge:text-slate-300" />
+                                    <ExternalLink className="h-3 w-3 text-slate-400 group-hover/badge:text-indigo-600 dark:group-hover/badge:text-slate-200 transition-colors" />
                                   </button>
                                 );
                               })}
@@ -423,39 +588,61 @@ export default function ChatWindow({
                     )}
                   </div>
 
-                  {/* Timestamp & Copy */}
+                  {/* Timestamp & Quick Share / Copy */}
                   <div
-                    className={`mt-1.5 flex items-center gap-2 px-1 text-[11px] text-slate-500 ${
+                    className={`mt-1.5 flex items-center gap-2 px-1 text-[11px] text-slate-400 ${
                       isUser ? "justify-end" : "justify-start"
                     }`}
                   >
                     <span>{message.timestamp}</span>
                     {!isUser && (
-                      <button
-                        onClick={() =>
-                          handleCopyMessage(message.id, message.content)
-                        }
-                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-slate-300 flex items-center gap-1"
-                        title="Copy answer"
-                      >
-                        {copiedId === message.id ? (
-                          <>
-                            <Check className="h-3 w-3 text-emerald-400" />
-                            <span className="text-emerald-400">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
+                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() =>
+                            openWhatsAppShare({
+                              type: "session",
+                              item: {
+                                id: activeSession?.id,
+                                title: activeSession?.title,
+                                messages: [message],
+                              },
+                            })
+                          }
+                          className="hover:text-[#25D366] flex items-center gap-1 text-slate-400 transition cursor-pointer"
+                          title="Share this answer to WhatsApp"
+                        >
+                          <WhatsAppIcon className="h-3 w-3 text-[#25D366]" />
+                          <span>WhatsApp</span>
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handleCopyMessage(message.id, message.content)
+                          }
+                          className="hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 text-slate-400 transition cursor-pointer"
+                          title="Copy answer"
+                        >
+                          {copiedId === message.id ? (
+                            <>
+                              <Check className="h-3 w-3 text-emerald-500" />
+                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                Copied
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
 
                 {isUser && (
-                  <div className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-slate-800 text-slate-300 ring-1 ring-slate-700">
+                  <div className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700">
                     <User className="h-5 w-5" />
                   </div>
                 )}
@@ -465,14 +652,14 @@ export default function ChatWindow({
 
           {isGenerating && (
             <div className="flex gap-3 md:gap-4 justify-start items-start animate-pulse">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 text-white">
                 <Bot className="h-5 w-5" />
               </div>
-              <div className="rounded-2xl rounded-tl-none border border-slate-800 bg-slate-900/80 px-4 py-3 text-slate-300 shadow-sm">
-                <div className="flex items-center gap-2 text-xs text-indigo-300">
-                  <span className="h-2 w-2 rounded-full bg-indigo-400 animate-ping" />
+              <div className="rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-4 py-3 text-slate-700 dark:text-slate-300 shadow-sm">
+                <div className="flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-300 font-medium">
+                  <span className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
                   <span>
-                    Searching multi-format vector embeddings & generating citations...
+                    Analyzing document semantic chunks & synthesizing verified answer...
                   </span>
                 </div>
               </div>
@@ -483,12 +670,43 @@ export default function ChatWindow({
         </div>
       </div>
 
-      {/* 3. Input Text Box */}
-      <div className="border-t border-slate-800/80 bg-slate-900/60 p-4 md:p-5 backdrop-blur-md">
+      {/* 3. Input Text Box Area */}
+      <div className="border-t border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/60 p-4 md:p-5 backdrop-blur-md transition-colors">
         <div className="mx-auto max-w-4xl">
+          {/* Active Document Scope Indicator */}
+          {activeDocument && (
+            <div className="mb-2 flex items-center justify-between px-1">
+              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                <span className="text-[11px] font-semibold text-slate-400">Target Document:</span>
+                <div className={`flex items-center gap-1.5 rounded-lg px-2 py-0.5 font-medium text-xs border ${activeDocTheme?.badgeBg} ${activeDocTheme?.badgeBorder}`}>
+                  <FileText className={`h-3 w-3 ${activeDocTheme?.iconColor}`} />
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[200px] sm:max-w-xs">
+                    {activeDocument.name}
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-indigo-500">
+                    {activeDocument.format}
+                  </span>
+                </div>
+                {documents.length > 1 && (
+                  <span className="text-[10px] text-slate-400">
+                    ({documents.length} docs loaded)
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={onToggleViewer}
+                className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+              >
+                {isViewerOpen ? "Hide Viewer" : "Inspect Document →"}
+              </button>
+            </div>
+          )}
+
           <form
             onSubmit={handleSubmit}
-            className="relative flex items-end gap-2 rounded-2xl border border-slate-800 bg-slate-950/80 p-2 shadow-xl shadow-black/30 transition focus-within:border-indigo-500/60 focus-within:ring-1 focus-within:ring-indigo-500/40"
+            className="relative flex items-end gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 p-2 shadow-lg shadow-slate-200/50 dark:shadow-black/30 transition focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20"
           >
             <textarea
               ref={textareaRef}
@@ -503,16 +721,20 @@ export default function ChatWindow({
                 )}px`;
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything across your PDFs, Excel sheets, Word docs, or Markdown files..."
-              className="flex-1 max-h-36 resize-none bg-transparent px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none"
+              placeholder={
+                activeDocument
+                  ? `Ask anything about "${activeDocument.name}"...`
+                  : "Ask any question or upload a document to get started..."
+              }
+              className="flex-1 max-h-36 resize-none bg-transparent px-3 py-2 text-xs md:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none"
             />
 
             <button
               type="submit"
               disabled={!inputText.trim() || isGenerating}
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all duration-200 ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
                 !inputText.trim() || isGenerating
-                  ? "bg-slate-800 text-slate-600 cursor-not-allowed"
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                   : "bg-indigo-600 text-white shadow-md shadow-indigo-600/30 hover:bg-indigo-500 hover:scale-105 active:scale-95"
               }`}
               title="Send message (Enter)"
@@ -521,23 +743,91 @@ export default function ChatWindow({
             </button>
           </form>
 
-          <div className="mt-2 flex items-center justify-between px-2 text-[11px] text-slate-500">
+          <div className="mt-2 flex items-center justify-between px-2 text-[11px] text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-1.5">
-              <Shield className="h-3 w-3 text-indigo-400" />
+              <Shield className="h-3 w-3 text-indigo-500" />
               <span>
-                Saved automatically to persistent session storage.
+                {geminiApiKey
+                  ? "Powered by Google Gemini RAG Intelligence"
+                  : "Powered by High-Precision Semantic RAG Engine"}
               </span>
             </div>
             <div className="hidden sm:flex items-center gap-1">
               <span>Press</span>
-              <kbd className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[10px] text-slate-400">
-                Enter ↵
+              <kbd className="rounded bg-slate-200 dark:bg-slate-800 px-1 py-0.5 font-mono text-[10px] text-slate-700 dark:text-slate-300">
+                Enter
               </kbd>
               <span>to send</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* 4. AI Engine / Gemini API Key Modal */}
+      {isApiKeyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-indigo-500" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  AI Provider Configuration
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsApiKeyModalOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              <p>
+                DocuSphere-AI works <strong>100% locally and offline</strong> using its built-in high-precision semantic RAG engine.
+              </p>
+              <p>
+                Optionally, you can connect your <strong>Google Gemini API Key</strong> for enhanced multi-paragraph synthesis:
+              </p>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Gemini API Key (Optional)
+                </label>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 font-mono"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Keys are stored safely in your local browser storage. Leave empty to use the built-in local engine.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => {
+                  setApiKeyInput("");
+                  onUpdateApiKey?.("");
+                  setIsApiKeyModalOpen(false);
+                }}
+                className="rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Use Local Engine
+              </button>
+              <button
+                onClick={handleSaveApiKey}
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 text-xs font-semibold shadow-sm cursor-pointer"
+              >
+                Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

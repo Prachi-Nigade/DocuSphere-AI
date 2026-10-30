@@ -12,7 +12,16 @@ export function loadSessions() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // If it contains legacy mock sessions, reset to clean initial sessions
+        const hasLegacyMock = parsed.some(
+          (s) =>
+            s.title?.includes("Security & Encryption Whitepaper Review") ||
+            s.title?.includes("Financial Performance Ledger") ||
+            s.preview?.includes("encryption standards and key management")
+        );
+        if (!hasLegacyMock) {
+          return parsed;
+        }
       }
     }
   } catch (err) {
@@ -80,12 +89,12 @@ export function createNewSession(customTitle = "New Knowledge Inquiry") {
           minute: "2-digit",
         }),
         content:
-          "Hello! This is a new **DocuSphere-AI** thread. Ask any questions regarding your indexed PDFs, Excel sheets, Word docs, or Markdown specifications.",
+          "Hello! This is a new **DocuSphere-AI** thread. Ask any questions regarding your uploaded PDFs, Excel sheets, Word docs, or Text files.",
         citations: [],
         suggestedQueries: [
-          "Summarize key compliance points in our handbook",
-          "What are the Q3 gross margins in the financial report?",
-          "Explain the encryption protocols in the security whitepaper",
+          "Summarize the active document",
+          "What are the key findings or takeaways?",
+          "Explain the important data points or metrics",
         ],
       },
     ],

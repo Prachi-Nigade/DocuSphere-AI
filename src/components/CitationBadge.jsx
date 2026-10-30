@@ -5,8 +5,6 @@ import {
   FileCode,
   ExternalLink,
   Sparkles,
-  Bookmark,
-  Check,
 } from "lucide-react";
 import {
   getFileFormat,
@@ -18,6 +16,7 @@ import {
  * CitationBadge Component
  * Displays a format-aware citation badge with an interactive hover tooltip
  * and keyboard-accessible inspection in the Side-by-Side Document Viewer.
+ * Fully supports Light and Dark modes.
  */
 export default function CitationBadge({ citation, onSelectCitation }) {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -83,7 +82,7 @@ export default function CitationBadge({ citation, onSelectCitation }) {
         aria-haspopup="dialog"
         aria-expanded={showTooltip}
         aria-label={`Source citation from ${citation.docName}, ${location}. Click to open document viewer.`}
-        className={`group/badge relative inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-150 shadow-xs hover:scale-[1.02] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:outline-hidden ${theme.badgeBg} ${theme.badgeBorder} hover:border-indigo-400 hover:bg-slate-800/90 text-slate-200`}
+        className={`group/badge relative inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all duration-150 shadow-xs hover:scale-[1.02] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:outline-hidden ${theme.badgeBg} ${theme.badgeBorder} hover:border-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800/90 text-slate-800 dark:text-slate-200 cursor-pointer`}
       >
         {/* Format Icon */}
         {format === "excel" ? (
@@ -104,26 +103,26 @@ export default function CitationBadge({ citation, onSelectCitation }) {
         )}
 
         {/* Truncated File Name */}
-        <span className="font-medium text-slate-100 max-w-[160px] sm:max-w-[200px] truncate">
+        <span className="font-semibold text-slate-900 dark:text-slate-100 max-w-[160px] sm:max-w-[200px] truncate">
           {citation.docName}
         </span>
 
         {/* Location Tag */}
         <span
-          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${theme.pillBg} ${theme.badgeText} border border-white/5`}
+          className={`rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${theme.pillBg} ${theme.badgeText} border border-slate-200/50 dark:border-white/5`}
         >
           {location}
         </span>
 
         {/* Similarity Score */}
         {citation.similarity && (
-          <span className="text-[10px] text-emerald-400 font-mono font-semibold">
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
             {Math.round(citation.similarity * 100)}%
           </span>
         )}
 
         <ExternalLink
-          className="h-3 w-3 text-slate-400 group-hover/badge:text-slate-200 transition-colors"
+          className="h-3 w-3 text-slate-400 group-hover/badge:text-indigo-600 dark:group-hover/badge:text-slate-200 transition-colors"
           aria-hidden="true"
         />
       </button>
@@ -136,47 +135,47 @@ export default function CitationBadge({ citation, onSelectCitation }) {
             if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
           }}
           onMouseLeave={handleMouseLeave}
-          className="fixed z-50 w-80 -translate-x-1/2 -translate-y-full rounded-xl border border-slate-700/80 bg-slate-900/95 p-3.5 shadow-2xl shadow-indigo-950/60 backdrop-blur-xl animate-fade-in pointer-events-auto"
+          className="fixed z-50 w-80 -translate-x-1/2 -translate-y-full rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/95 p-3.5 shadow-2xl shadow-slate-300/60 dark:shadow-indigo-950/60 backdrop-blur-xl animate-fade-in pointer-events-auto"
           style={{
             top: `${tooltipPos.top}px`,
             left: `${tooltipPos.left}px`,
           }}
         >
           {/* Tooltip Header */}
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2">
             <div className="flex items-center gap-1.5 overflow-hidden">
               <span
                 className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${theme.badgeBg} ${theme.badgeText}`}
               >
                 {theme.label}
               </span>
-              <span className="font-semibold text-xs text-slate-100 truncate max-w-[160px]">
+              <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate max-w-[160px]">
                 {citation.docName}
               </span>
             </div>
 
             {citation.similarity && (
-              <span className="rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-300 border border-emerald-500/20">
+              <span className="rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-300 border border-emerald-500/20">
                 {Math.round(citation.similarity * 100)}% Match
               </span>
             )}
           </div>
 
           {/* Location & Chunk Metadata */}
-          <div className="flex items-center gap-2 text-[11px] text-slate-300 mb-2 font-mono">
-            <span className="text-indigo-300 font-semibold">{location}</span>
+          <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300 mb-2 font-mono">
+            <span className="text-indigo-600 dark:text-indigo-300 font-bold">{location}</span>
             <span>•</span>
             <span className="text-slate-400">pgvector Chunk</span>
           </div>
 
           {/* Verbatim Excerpt Snippet */}
-          <div className="relative rounded-lg border border-slate-800 bg-slate-950/70 p-2.5 text-[11px] leading-relaxed text-slate-300 font-sans italic line-clamp-3">
+          <div className="relative rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/70 p-2.5 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300 font-sans italic line-clamp-3">
             "{citation.snippet || "Verified chunk excerpt from document index."}"
           </div>
 
           {/* Action Hint */}
-          <div className="mt-2.5 flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-slate-400">
-            <span className="flex items-center gap-1 text-indigo-300">
+          <div className="mt-2.5 flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 text-[10px] text-slate-500">
+            <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-300 font-medium">
               <Sparkles className="h-3 w-3" />
               <span>Click to inspect full document</span>
             </span>
@@ -184,7 +183,7 @@ export default function CitationBadge({ citation, onSelectCitation }) {
           </div>
 
           {/* Tooltip Arrow */}
-          <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+          <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-200 dark:border-t-slate-800" />
         </div>
       )}
     </div>

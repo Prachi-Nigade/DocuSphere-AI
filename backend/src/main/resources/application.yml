@@ -1,0 +1,72 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: docusphere-backend
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:docusphere}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 25
+          lob:
+            non_contextual_creation: true
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+# DocuSphere-AI Application Custom Config
+docusphere:
+  cors:
+    allowed-origins:
+      - "http://localhost:5173"
+      - "http://localhost:3000"
+      - "http://127.0.0.1:5173"
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    allowed-headers: "*"
+    allow-credentials: true
+    max-age-seconds: 3600
+
+  rag:
+    similarity-threshold: 0.78
+    default-top-k: 4
+    embedding-dimension: 1536
+    embedding-model: "text-embedding-3-large"
+
+# Actuator Health Metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

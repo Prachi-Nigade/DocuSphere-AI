@@ -12,7 +12,6 @@ import {
   Sparkles,
   ShieldCheck,
   Eye,
-  Layers,
 } from "lucide-react";
 import {
   exportSessionToMarkdown,
@@ -27,6 +26,7 @@ import {
  * ExportModal Component
  * Displays clear, high-visibility export options with working download actions,
  * print report triggers, and live transcript previews.
+ * Fully styled for Light and Dark themes.
  */
 export default function ExportModal({ session, onClose }) {
   const [activeTab, setActiveTab] = useState("options"); // "options" | "preview"
@@ -67,19 +67,25 @@ export default function ExportModal({ session, onClose }) {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-2xl rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl shadow-indigo-950/50 flex flex-col max-h-[90vh]">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-sm animate-fade-in"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-2xl rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl shadow-slate-300/60 dark:shadow-indigo-950/50 flex flex-col max-h-[90vh] transition-colors"
+      >
         {/* 1. Header */}
-        <div className="flex items-start justify-between border-b border-slate-800 p-5 pb-4">
+        <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 p-5 pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-white/10">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-white/20">
               <Download className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <span>Export Conversation & Evidence</span>
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {session.title} • {session.messages.length} messages •{" "}
                 {citationsCount} citations
               </p>
@@ -88,7 +94,7 @@ export default function ExportModal({ session, onClose }) {
 
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-100 transition"
             title="Close export dialog"
           >
             <X className="h-5 w-5" />
@@ -96,24 +102,24 @@ export default function ExportModal({ session, onClose }) {
         </div>
 
         {/* 2. Tab Bar: [Export Options] vs [Live Preview] */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-950/60 px-5 py-2 text-xs">
-          <div className="flex items-center gap-1 rounded-lg bg-slate-900 p-1 border border-slate-800">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/60 px-5 py-2 text-xs">
+          <div className="flex items-center gap-1 rounded-xl bg-slate-200/70 dark:bg-slate-900 p-1 border border-slate-200 dark:border-slate-800">
             <button
               onClick={() => setActiveTab("options")}
-              className={`rounded-md px-3 py-1 font-medium transition ${
+              className={`rounded-lg px-3 py-1 font-semibold transition ${
                 activeTab === "options"
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
               }`}
             >
               Export Options
             </button>
             <button
               onClick={() => setActiveTab("preview")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1 font-medium transition ${
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 font-semibold transition ${
                 activeTab === "preview"
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
               }`}
             >
               <Eye className="h-3 w-3" />
@@ -133,20 +139,20 @@ export default function ExportModal({ session, onClose }) {
               {/* Grid of 4 Clear Export Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Markdown (.md) */}
-                <div className="flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-4 transition-all hover:border-slate-700 hover:bg-slate-800/20">
+                <div className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-4 transition-all hover:border-purple-300 dark:hover:border-slate-700">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400 ring-1 ring-purple-500/20">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-1 ring-purple-500/20">
                         <FileText className="h-4 w-4" />
                       </div>
-                      <span className="rounded bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-300">
+                      <span className="rounded bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300">
                         Recommended
                       </span>
                     </div>
-                    <h4 className="text-xs font-semibold text-slate-200">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200">
                       Markdown Document (.md)
                     </h4>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
                       Full dialogue transcript, headings, and a consolidated
                       references table with page citations. Ideal for Notion &
                       Obsidian.
@@ -157,10 +163,10 @@ export default function ExportModal({ session, onClose }) {
                     onClick={() =>
                       handleDownload("md", exportSessionToMarkdown)
                     }
-                    className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
+                    className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition ${
                       downloadStatus.md
                         ? "bg-emerald-600 text-white"
-                        : "bg-purple-600 text-white hover:bg-purple-500 shadow-md shadow-purple-950/50"
+                        : "bg-purple-600 text-white hover:bg-purple-500 shadow-sm"
                     }`}
                   >
                     {downloadStatus.md ? (
@@ -178,20 +184,20 @@ export default function ExportModal({ session, onClose }) {
                 </div>
 
                 {/* 2. Executive PDF / Print */}
-                <div className="flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-4 transition-all hover:border-slate-700 hover:bg-slate-800/20">
+                <div className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-4 transition-all hover:border-blue-300 dark:hover:border-slate-700">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20">
                         <Printer className="h-4 w-4" />
                       </div>
-                      <span className="rounded bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-300">
+                      <span className="rounded bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300">
                         Executive PDF
                       </span>
                     </div>
-                    <h4 className="text-xs font-semibold text-slate-200">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200">
                       Printable Report / PDF
                     </h4>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
                       Clean formatted executive briefing with verified
                       citations. Direct browser print dialog to save as PDF.
                     </p>
@@ -201,10 +207,10 @@ export default function ExportModal({ session, onClose }) {
                     onClick={() =>
                       handleDownload("pdf", printSessionReport)
                     }
-                    className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
+                    className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition ${
                       downloadStatus.pdf
                         ? "bg-emerald-600 text-white"
-                        : "bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-950/50"
+                        : "bg-blue-600 text-white hover:bg-blue-500 shadow-sm"
                     }`}
                   >
                     {downloadStatus.pdf ? (
@@ -222,20 +228,20 @@ export default function ExportModal({ session, onClose }) {
                 </div>
 
                 {/* 3. Structured JSON (.json) */}
-                <div className="flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-4 transition-all hover:border-slate-700 hover:bg-slate-800/20">
+                <div className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-4 transition-all hover:border-emerald-300 dark:hover:border-slate-700">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20">
                         <FileCode className="h-4 w-4" />
                       </div>
-                      <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                      <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
                         API Data
                       </span>
                     </div>
-                    <h4 className="text-xs font-semibold text-slate-200">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200">
                       Structured JSON (.json)
                     </h4>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
                       Raw machine-readable payload containing message arrays,
                       similarity scores, and vector coordinate metadata.
                     </p>
@@ -245,10 +251,10 @@ export default function ExportModal({ session, onClose }) {
                     onClick={() =>
                       handleDownload("json", exportSessionToJSON)
                     }
-                    className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
+                    className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition ${
                       downloadStatus.json
                         ? "bg-emerald-600 text-white"
-                        : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-md shadow-emerald-950/50"
+                        : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm"
                     }`}
                   >
                     {downloadStatus.json ? (
@@ -266,20 +272,20 @@ export default function ExportModal({ session, onClose }) {
                 </div>
 
                 {/* 4. Plain Text (.txt) */}
-                <div className="flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-4 transition-all hover:border-slate-700 hover:bg-slate-800/20">
+                <div className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-4 transition-all hover:border-amber-300 dark:hover:border-slate-700">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20">
                         <FileCheck className="h-4 w-4" />
                       </div>
-                      <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                      <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
                         Universal
                       </span>
                     </div>
-                    <h4 className="text-xs font-semibold text-slate-200">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200">
                       Plain Text Transcript (.txt)
                     </h4>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
                       Clean plain text transcript with source citations.
                       Effortless to copy or paste into plain email notes.
                     </p>
@@ -289,10 +295,10 @@ export default function ExportModal({ session, onClose }) {
                     onClick={() =>
                       handleDownload("txt", exportSessionToPlainText)
                     }
-                    className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
+                    className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition ${
                       downloadStatus.txt
                         ? "bg-emerald-600 text-white"
-                        : "bg-amber-600 text-white hover:bg-amber-500 shadow-md shadow-amber-950/50"
+                        : "bg-amber-600 text-white hover:bg-amber-500 shadow-sm"
                     }`}
                   >
                     {downloadStatus.txt ? (
@@ -311,10 +317,10 @@ export default function ExportModal({ session, onClose }) {
               </div>
 
               {/* Quick Copy Section */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3.5 mt-2">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 p-3.5 mt-2">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
                     Quick Clipboard Actions
                   </span>
                   <span className="text-[10px] text-slate-500">
@@ -325,12 +331,12 @@ export default function ExportModal({ session, onClose }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button
                     onClick={handleCopySlack}
-                    className="flex items-center justify-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 hover:border-indigo-500/40 hover:bg-slate-800 transition"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
                   >
                     {copiedSlack ? (
-                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <Check className="h-3.5 w-3.5 text-emerald-500" />
                     ) : (
-                      <MessageSquare className="h-3.5 w-3.5 text-indigo-400" />
+                      <MessageSquare className="h-3.5 w-3.5 text-indigo-500" />
                     )}
                     <span>
                       {copiedSlack ? "Copied Slack Summary!" : "Copy for Slack / Teams"}
@@ -339,12 +345,12 @@ export default function ExportModal({ session, onClose }) {
 
                   <button
                     onClick={handleCopyRawMd}
-                    className="flex items-center justify-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 hover:border-indigo-500/40 hover:bg-slate-800 transition"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
                   >
                     {copiedRawMd ? (
-                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <Check className="h-3.5 w-3.5 text-emerald-500" />
                     ) : (
-                      <Copy className="h-3.5 w-3.5 text-indigo-400" />
+                      <Copy className="h-3.5 w-3.5 text-indigo-500" />
                     )}
                     <span>
                       {copiedRawMd ? "Copied Markdown!" : "Copy Full Markdown"}
@@ -355,22 +361,22 @@ export default function ExportModal({ session, onClose }) {
             </>
           ) : (
             /* Tab 2: Live Markdown Preview */
-            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 font-mono text-xs leading-relaxed text-slate-300 whitespace-pre-wrap max-h-96 overflow-y-auto">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/70 p-4 font-mono text-xs leading-relaxed text-slate-800 dark:text-slate-300 whitespace-pre-wrap max-h-96 overflow-y-auto">
               {markdownPreview}
             </div>
           )}
         </div>
 
         {/* 4. Footer */}
-        <div className="flex items-center justify-between border-t border-slate-800/80 bg-slate-950/60 p-4 px-5 text-xs text-slate-400">
+        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/60 p-4 px-5 text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <ShieldCheck className="h-4 w-4 text-emerald-500" />
             <span>Includes verified citations & page numbers</span>
           </div>
 
           <button
             onClick={onClose}
-            className="rounded-lg bg-slate-800 px-4 py-1.5 font-medium text-slate-200 hover:bg-slate-700 transition"
+            className="rounded-xl bg-slate-200 dark:bg-slate-800 px-4 py-1.5 font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700 transition"
           >
             Done
           </button>

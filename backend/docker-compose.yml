@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: docusphere-pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: docusphere
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+      - ./src/main/resources/db/migration/V1__init_pgvector_schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docusphere"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgvector_data:
+    driver: local

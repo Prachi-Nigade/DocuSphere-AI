@@ -15,25 +15,22 @@ import {
   FileCode,
   PanelRightClose,
   PanelRightOpen,
-  ExternalLink,
   Plus,
   Edit2,
   Download,
-  Sun,
-  Moon,
   UploadCloud,
   KeyRound,
   X,
-  LogOut,
+  Share2,
+  MoreVertical,
+  Eye,
 } from "lucide-react";
 import {
   getFileFormat,
   getFormatTheme,
   formatCitationLocation,
 } from "../utils/documentUtils";
-import { useTheme } from "../context/ThemeContext";
 import { useAuthRbac } from "../context/AuthRbacContext";
-import RoleSelector from "./RoleSelector";
 import { openWhatsAppShare } from "../utils/shareUtils";
 
 function WhatsAppIcon({ className = "h-3.5 w-3.5" }) {
@@ -111,9 +108,11 @@ function renderBoldAndCode(str) {
 }
 
 /**
- * ChatWindow Component
- * Conversation interface with real multi-format document analysis,
- * persistent session controls, theme toggling, and grounded citations.
+ * ChatWindow Component - DocuSphere-AI
+ * User requirements applied:
+ * - Header right side corner: ONLY shows three dots button
+ * - In three dots menu: Export and Share options (plus viewer toggle & AI config)
+ * - Chat section: prominent Upload Document option, downside as it is
  */
 export default function ChatWindow({
   activeSession,
@@ -134,7 +133,6 @@ export default function ChatWindow({
   onUploadDocument,
   geminiApiKey = "",
   onUpdateApiKey,
-  onLogout,
 }) {
   const [inputText, setInputText] = useState("");
   const [copiedId, setCopiedId] = useState(null);
@@ -144,18 +142,32 @@ export default function ChatWindow({
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey || "");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
+  // Three dots dropdown menu state
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const { toggleTheme, isDark } = useTheme();
-  const { openRbacModal, logAuditEvent } = useAuthRbac();
+  const { logAuditEvent } = useAuthRbac();
 
   const messages = activeSession?.messages || [];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isGenerating]);
+
+  // Click outside listener for three-dots menu
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => window.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSubmit = (e) => {
     e?.preventDefault();
@@ -224,6 +236,7 @@ export default function ChatWindow({
         isDraggingOver ? "ring-4 ring-indigo-500/50 bg-indigo-50/20" : ""
       }`}
     >
+      {/* File input for chat section document upload */}
       <input
         ref={fileInputRef}
         type="file"
@@ -237,12 +250,12 @@ export default function ChatWindow({
         }}
       />
 
-      {/* 1. Header Toolbar */}
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/60 px-4 md:px-6 backdrop-blur-md transition-colors">
+      {/* 1. HEADER TOOLBAR: CLEAN, ONLY THREE DOTS IN RIGHT CORNER */}
+      <header className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/60 px-4 md:px-6 backdrop-blur-md transition-colors">
         <div className="flex items-center gap-3 overflow-hidden">
           <button
             onClick={onToggleSidebar}
-            className="rounded-xl p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 md:hidden"
+            className="rounded-xl p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 md:hidden cursor-pointer"
             title="Toggle Sidebar"
           >
             <Menu className="h-5 w-5" />
@@ -266,7 +279,7 @@ export default function ChatWindow({
                   />
                   <button
                     onClick={handleSaveTitle}
-                    className="rounded p-1 text-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    className="rounded p-1 text-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                   >
                     <Check className="h-3.5 w-3.5" />
                   </button>
@@ -288,7 +301,7 @@ export default function ChatWindow({
                       setTempTitle(activeSession?.title || "");
                       setIsEditingTitle(true);
                     }}
-                    className="opacity-0 group-hover/title:opacity-100 transition-opacity p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    className="opacity-0 group-hover/title:opacity-100 transition-opacity p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                     title="Rename thread"
                   >
                     <Edit2 className="h-3 w-3" />
@@ -297,17 +310,17 @@ export default function ChatWindow({
               )}
 
               {/* Status Badge */}
-              <span className="hidden lg:inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Real-Time RAG
               </span>
             </div>
 
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
               <span>{messages.length} messages</span>
               <span>•</span>
               {activeDocument ? (
-                <span className="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                <span className="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1 truncate">
                   Active: <strong className="font-semibold text-indigo-600 dark:text-indigo-400 truncate max-w-[150px]">{activeDocument.name}</strong>
                 </span>
               ) : (
@@ -317,121 +330,142 @@ export default function ChatWindow({
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
-          {/* AI Engine & API Key Switcher */}
+        {/* ------------------------------------------------------------- */}
+        {/* RIGHT SIDE TOP CORNER: PROPER, CLEAN & WORKING THREE DOTS     */}
+        {/* ------------------------------------------------------------- */}
+        <div className="relative" ref={menuRef}>
           <button
-            onClick={() => {
-              setApiKeyInput(geminiApiKey || "");
-              setIsApiKeyModalOpen(true);
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMenuOpen((prev) => !prev);
             }}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-xs"
-            title="Configure AI Engine (Google Gemini API or Built-in Semantic RAG)"
-          >
-            <Sparkles className={`h-3.5 w-3.5 ${geminiApiKey ? "text-amber-500" : "text-indigo-500"}`} />
-            <span className="hidden xl:inline">{geminiApiKey ? "Gemini LLM" : "Local RAG"}</span>
-          </button>
-
-          {/* RBAC Active Role Persona & Switcher */}
-          <RoleSelector compact={false} />
-
-          {/* RBAC Matrix & Governance Dialog Trigger */}
-          <button
-            onClick={() => openRbacModal("matrix")}
-            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/70 dark:bg-purple-950/30 px-2.5 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:border-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition shadow-xs cursor-pointer"
-            title="Role-Based Access Control (RBAC) Governance"
-          >
-            <Shield className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-            <span className="hidden xl:inline">RBAC</span>
-          </button>
-
-          {/* THEME TOGGLE: Switch between Light and Dark */}
-          <button
-            onClick={toggleTheme}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-xs"
-            title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-          >
-            {isDark ? (
-              <>
-                <Sun className="h-3.5 w-3.5 text-amber-400" />
-                <span className="hidden md:inline">Light</span>
-              </>
-            ) : (
-              <>
-                <Moon className="h-3.5 w-3.5 text-indigo-600" />
-                <span className="hidden md:inline">Dark</span>
-              </>
-            )}
-          </button>
-
-          {/* Share Insights Button (WhatsApp & Socials) */}
-          <button
-            onClick={onOpenShareModal}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366] transition shadow-xs"
-            title="Share Insights & Summary via WhatsApp & Socials"
-          >
-            <WhatsAppIcon className="h-3.5 w-3.5 text-[#25D366]" />
-            <span className="hidden sm:inline">Share</span>
-          </button>
-
-          {/* Export Button */}
-          <button
-            onClick={onOpenExportModal}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:text-indigo-600 dark:hover:text-indigo-200 transition shadow-xs"
-            title="Export Conversation Transcript & Evidence"
-          >
-            <Download className="h-3.5 w-3.5 text-indigo-500" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
-
-          {/* New Chat Button */}
-          <button
-            onClick={onCreateNewSession}
-            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition shadow-xs"
-            title="Create New Chat Thread"
-          >
-            <Plus className="h-3.5 w-3.5 text-emerald-500" />
-            <span>New Thread</span>
-          </button>
-
-          {/* Toggle Side-by-Side Document Viewer */}
-          <button
-            onClick={onToggleViewer}
-            className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
-              isViewerOpen
-                ? "border-indigo-500 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300"
-                : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition shadow-xs cursor-pointer ${
+              isMenuOpen
+                ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 ring-2 ring-indigo-500/20"
+                : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
             }`}
-            title="Toggle Side-by-Side Document Viewer"
+            title="Options & Actions"
           >
-            {isViewerOpen ? (
-              <>
-                <PanelRightClose className="h-3.5 w-3.5 text-indigo-500" />
-                <span className="hidden md:inline">Close Viewer</span>
-              </>
-            ) : (
-              <>
-                <PanelRightOpen className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                <span className="hidden md:inline">Split Viewer</span>
-              </>
-            )}
+            <MoreVertical className="h-5 w-5" />
           </button>
 
-          {/* Sign Out Button */}
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-rose-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition shadow-xs cursor-pointer"
-              title="Sign Out of DocuSphere-AI"
+          {/* Three Dots Dropdown Menu: Clean, Clear & Fully Working */}
+          {isMenuOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 shadow-2xl shadow-slate-400/30 dark:shadow-black/80 backdrop-blur-xl z-50 text-xs animate-in fade-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
             >
-              <LogOut className="h-3.5 w-3.5 text-rose-500" />
-              <span className="hidden xl:inline">Sign Out</span>
-            </button>
+              {/* Menu Category Header */}
+              <div className="px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-800/80 mb-1 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Workspace Actions
+                </span>
+                <span className="text-[10px] font-mono text-indigo-500 font-bold">
+                  DocuSphere
+                </span>
+              </div>
+
+              {/* 1. Share Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onOpenShareModal?.();
+                }}
+                className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer group"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition">
+                  <Share2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                    Share Insights
+                  </span>
+                  <span className="text-[10px] text-slate-400 block -mt-0.5">
+                    WhatsApp, socials & web link
+                  </span>
+                </div>
+              </button>
+
+              {/* 2. Export Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onOpenExportModal?.();
+                }}
+                className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer group"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition">
+                  <Download className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                    Export Transcript
+                  </span>
+                  <span className="text-[10px] text-slate-400 block -mt-0.5">
+                    Download PDF, Markdown or JSON
+                  </span>
+                </div>
+              </button>
+
+              {/* 3. Document Split Viewer Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onToggleViewer?.();
+                }}
+                className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer group"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition">
+                  {isViewerOpen ? (
+                    <PanelRightClose className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </div>
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    {isViewerOpen ? "Close Document Viewer" : "Open Document Viewer"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block -mt-0.5">
+                    {isViewerOpen ? "Hide split-screen view" : "Inspect document citations"}
+                  </span>
+                </div>
+              </button>
+
+              {/* 4. AI Engine Configuration */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setApiKeyInput(geminiApiKey || "");
+                  setIsApiKeyModalOpen(true);
+                }}
+                className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-amber-50 dark:hover:bg-amber-950/40 transition cursor-pointer group border-t border-slate-100 dark:border-slate-800/80 mt-1 pt-1.5"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs group-hover:text-amber-600 dark:group-hover:text-amber-400">
+                    AI Engine Setup
+                  </span>
+                  <span className="text-[10px] text-slate-400 block -mt-0.5">
+                    {geminiApiKey ? "Gemini 1.5/2.0 Key Active" : "Local RAG Active"}
+                  </span>
+                </div>
+              </button>
+            </div>
           )}
         </div>
       </header>
 
-      {/* 2. Message History Area */}
+      {/* ------------------------------------------------------------- */}
+      {/* 2. MESSAGE HISTORY AREA                                        */}
+      {/* ------------------------------------------------------------- */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <div className="mx-auto max-w-4xl space-y-6">
           {/* Empty State Banner if no documents are uploaded yet */}
@@ -548,115 +582,80 @@ export default function ChatWindow({
                                     title="Click to view & highlight in Side-by-Side Document Viewer"
                                   >
                                     {format === "excel" ? (
-                                      <FileSpreadsheet
-                                        className={`h-3.5 w-3.5 ${theme.iconColor}`}
-                                      />
-                                    ) : format === "markdown" ? (
-                                      <FileCode
-                                        className={`h-3.5 w-3.5 ${theme.iconColor}`}
-                                      />
+                                      <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
+                                    ) : format === "code" ||
+                                      format === "markdown" ? (
+                                      <FileCode className="h-3.5 w-3.5 text-amber-500" />
                                     ) : (
-                                      <FileText
-                                        className={`h-3.5 w-3.5 ${theme.iconColor}`}
-                                      />
+                                      <FileText className={`h-3.5 w-3.5 ${theme.iconColor}`} />
                                     )}
-
-                                    <span className="font-semibold text-slate-800 dark:text-slate-200 max-w-[120px] truncate">
+                                    <span className="font-semibold text-slate-800 dark:text-slate-200">
                                       {citation.docName}
                                     </span>
-
-                                    <span
-                                      className={`rounded px-1.5 py-0.2 text-[10px] font-mono font-bold ${theme.pillBg} ${theme.badgeText}`}
-                                    >
+                                    <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">
                                       {location}
                                     </span>
-
-                                    {citation.similarity && (
-                                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
-                                        {Math.round(citation.similarity * 100)}%
-                                      </span>
-                                    )}
-
-                                    <ExternalLink className="h-3 w-3 text-slate-400 group-hover/badge:text-indigo-600 dark:group-hover/badge:text-slate-200 transition-colors" />
                                   </button>
                                 );
                               })}
                             </div>
                           </div>
                         )}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Timestamp & Quick Share / Copy */}
-                  <div
-                    className={`mt-1.5 flex items-center gap-2 px-1 text-[11px] text-slate-400 ${
-                      isUser ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    <span>{message.timestamp}</span>
-                    {!isUser && (
-                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() =>
-                            openWhatsAppShare({
-                              type: "session",
-                              item: {
-                                id: activeSession?.id,
-                                title: activeSession?.title,
-                                messages: [message],
-                              },
-                            })
-                          }
-                          className="hover:text-[#25D366] flex items-center gap-1 text-slate-400 transition cursor-pointer"
-                          title="Share this answer to WhatsApp"
-                        >
-                          <WhatsAppIcon className="h-3 w-3 text-[#25D366]" />
-                          <span>WhatsApp</span>
-                        </button>
+                        {/* Message Actions */}
+                        <div className="mt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800/60 pt-2 text-xs text-slate-400">
+                          <span className="text-[10px]">
+                            {message.timestamp}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() =>
+                                handleCopyMessage(message.id, message.content)
+                              }
+                              className="flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                              title="Copy Answer"
+                            >
+                              {copiedId === message.id ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                  <span className="text-[10px] text-emerald-500 font-semibold">
+                                    Copied
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3.5 w-3.5" />
+                                  <span className="text-[10px]">Copy</span>
+                                </>
+                              )}
+                            </button>
 
-                        <button
-                          onClick={() =>
-                            handleCopyMessage(message.id, message.content)
-                          }
-                          className="hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 text-slate-400 transition cursor-pointer"
-                          title="Copy answer"
-                        >
-                          {copiedId === message.id ? (
-                            <>
-                              <Check className="h-3 w-3 text-emerald-500" />
-                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                                Copied
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
+                            <button
+                              onClick={() => openWhatsAppShare(message.content)}
+                              className="flex items-center gap-1 rounded-lg px-2 py-1 text-slate-400 hover:text-[#25D366] hover:bg-[#25D366]/10 transition"
+                              title="Share Answer to WhatsApp"
+                            >
+                              <WhatsAppIcon className="h-3.5 w-3.5 text-[#25D366]" />
+                              <span className="text-[10px]">WhatsApp</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
-
-                {isUser && (
-                  <div className="flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700">
-                    <User className="h-5 w-5" />
-                  </div>
-                )}
               </div>
             );
           })}
 
+          {/* Real-time Typing / Inference Indicator */}
           {isGenerating && (
-            <div className="flex gap-3 md:gap-4 justify-start items-start animate-pulse">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 text-white">
+            <div className="flex gap-3 md:gap-4 justify-start">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md animate-pulse">
                 <Bot className="h-5 w-5" />
               </div>
-              <div className="rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-4 py-3 text-slate-700 dark:text-slate-300 shadow-sm">
-                <div className="flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-300 font-medium">
+              <div className="rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium">
                   <span className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
                   <span>
                     Analyzing document semantic chunks & synthesizing verified answer...
@@ -670,14 +669,16 @@ export default function ChatWindow({
         </div>
       </div>
 
-      {/* 3. Input Text Box Area */}
+      {/* ------------------------------------------------------------- */}
+      {/* 3. CHAT INPUT SECTION WITH UPLOAD DOCUMENT OPTION             */}
+      {/* ------------------------------------------------------------- */}
       <div className="border-t border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/60 p-4 md:p-5 backdrop-blur-md transition-colors">
         <div className="mx-auto max-w-4xl">
-          {/* Active Document Scope Indicator */}
-          {activeDocument && (
-            <div className="mb-2 flex items-center justify-between px-1">
-              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                <span className="text-[11px] font-semibold text-slate-400">Target Document:</span>
+          {/* Target Document & In-Chat Document Upload Bar */}
+          <div className="mb-2.5 flex items-center justify-between px-1 gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 min-w-0">
+              <span className="text-[11px] font-semibold text-slate-400">Target Document:</span>
+              {activeDocument ? (
                 <div className={`flex items-center gap-1.5 rounded-lg px-2 py-0.5 font-medium text-xs border ${activeDocTheme?.badgeBg} ${activeDocTheme?.badgeBorder}`}>
                   <FileText className={`h-3 w-3 ${activeDocTheme?.iconColor}`} />
                   <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[200px] sm:max-w-xs">
@@ -687,23 +688,36 @@ export default function ChatWindow({
                     {activeDocument.format}
                   </span>
                 </div>
-                {documents.length > 1 && (
-                  <span className="text-[10px] text-slate-400">
-                    ({documents.length} docs loaded)
-                  </span>
-                )}
-              </div>
+              ) : (
+                <span className="text-xs text-slate-400 italic">No document selected</span>
+              )}
+            </div>
 
+            <div className="flex items-center gap-2">
+              {/* UPLOAD DOCUMENT OPTION IN CHAT SECTION */}
               <button
                 type="button"
-                onClick={onToggleViewer}
-                className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/80 dark:bg-indigo-950/40 px-2.5 py-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition shadow-2xs cursor-pointer"
+                title="Upload and ingest a new document (PDF, Word, Excel, Markdown)"
               >
-                {isViewerOpen ? "Hide Viewer" : "Inspect Document →"}
+                <UploadCloud className="h-3.5 w-3.5" />
+                <span>Upload Document</span>
               </button>
-            </div>
-          )}
 
+              {activeDocument && (
+                <button
+                  type="button"
+                  onClick={onToggleViewer}
+                  className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                >
+                  {isViewerOpen ? "Hide Viewer" : "Inspect Document →"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* DOWNSIDE AS IT IS: INPUT TEXTAREA, SEND BUTTON, ENGINE NOTE */}
           <form
             onSubmit={handleSubmit}
             className="relative flex items-end gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 p-2 shadow-lg shadow-slate-200/50 dark:shadow-black/30 transition focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20"
@@ -776,7 +790,7 @@ export default function ChatWindow({
               </div>
               <button
                 onClick={() => setIsApiKeyModalOpen(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>

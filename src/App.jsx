@@ -455,6 +455,7 @@ export default function App() {
         onDeleteDocument={handleDeleteDocument}
         onSelectDocument={handleSelectDocument}
         activeDocumentId={activeDocument?.id}
+        activeDocument={activeDocument}
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
         onLogout={logout}
